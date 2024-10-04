@@ -71,4 +71,20 @@ const loginUser = async (req, res) => {
   }
 };
 
-export { createUser, loginUser };
+//api to get user
+const getUser = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const userData = await userModel.findById(userId).select('-password');
+    res.json({
+      success: true,
+      message: 'User fetched successfully',
+      userData,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.json({ success: false, message: error.message });
+  }
+};
+
+export { createUser, loginUser, getUser };
