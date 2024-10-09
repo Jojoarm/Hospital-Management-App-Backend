@@ -6,6 +6,7 @@ import {
   getAppointments,
   getUser,
   loginUser,
+  stripePayment,
   updateUser,
 } from '../controllers/userController.js';
 import authUser from '../middlewares/authUser.js';
@@ -25,5 +26,6 @@ userRouter.post(
 userRouter.post('/book-appointment', authUser, bookAppointment);
 userRouter.get('/appointments', authUser, getAppointments);
 userRouter.post('/cancel-appointment', authUser, cancelAppointment);
+userRouter.post('/payment', authUser, stripePayment);
 
 export default userRouter;

@@ -5,6 +5,11 @@ import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import doctorModel from '../models/doctorModel.js';
 import appointmentModel from '../models/appointmentModel.js';
+import Stripe from 'stripe';
+import orderModel from '../models/orderModel.js';
+
+const STRIPE = new Stripe(process.env.STRIPE_API_KEY);
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 //api to register user
 const createUser = async (req, res) => {
@@ -228,6 +233,63 @@ const cancelAppointment = async (req, res) => {
   }
 };
 
+//api to make payment using stripe
+const stripePayment = async (req, res) => {
+  try {
+    const { userId, appointmentId } = req.body;
+    const userData = await userModel.findById(userId).select('-password');
+    const appointment = await appointmentModel.findById(appointmentId);
+    if (!appointment) {
+      return res.json({ success: false, message: 'Cannot process payment' });
+    }
+
+    const orderData = {
+      userId,
+      userData,
+      appointmentId,
+      amount: appointment.amount,
+    };
+
+    const lineItems = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: appointment.docData.name,
+          },
+          unit_amount: Math.round(appointment.amount * 100),
+        },
+        quantity: 1,
+      },
+    ];
+    const session = await STRIPE.checkout.sessions.create({
+      line_items: lineItems,
+      payment_method_types: ['card'],
+      mode: 'payment',
+      success_url: `${FRONTEND_URL}/my-appointments`,
+      cancel_url: `${FRONTEND_URL}/doctors`,
+    });
+
+    if (!session.url) {
+      return res.status(500).json({ message: 'Error creating stripe session' });
+    }
+
+    const newOrder = new orderModel(orderData);
+    await newOrder.save();
+
+    await appointmentModel.findByIdAndUpdate(appointmentId, { payment: true });
+
+    return res.json({
+      success: true,
+      message: 'Appointment booked!',
+      url: session.url,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.json({ success: false, message: error.message });
+  }
+};
+
 export {
   createUser,
   loginUser,
@@ -236,4 +298,5 @@ export {
   bookAppointment,
   getAppointments,
   cancelAppointment,
+  stripePayment,
 };
